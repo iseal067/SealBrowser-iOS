@@ -14,12 +14,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Extract Seal Browser project
+        run: |
+          unzip -q SealBrowser-iOS-Source.zip -d ios-project
+          ls -la ios-project
+
       - name: Build unsigned iPhone app
-        working-directory: SealBrowser-iOS-GitHub-IPA-Builder
+        working-directory: ios-project
         run: |
           set -euo pipefail
-
-          rm -rf build Payload SealBrowser-unsigned.ipa
 
           xcodebuild \
             -project SealBrowser.xcodeproj \
@@ -33,15 +36,15 @@ jobs:
             CODE_SIGN_IDENTITY='' \
             clean build
 
-          APP_PATH="build/Build/Products/Release-iphoneos/SealBrowser.app"
-
+      - name: Package IPA
+        working-directory: ios-project
+        run: |
           mkdir -p Payload
-          cp -R "$APP_PATH" Payload/SealBrowser.app
-          /usr/bin/zip -qry SealBrowser-unsigned.ipa Payload
+          cp -R build/Build/Products/Release-iphoneos/SealBrowser.app Payload/SealBrowser.app
+          zip -qry SealBrowser-unsigned.ipa Payload
 
       - name: Upload IPA
         uses: actions/upload-artifact@v7
         with:
           name: SealBrowser-iPhone-IPA
-          path: SealBrowser-iOS-GitHub-IPA-Builder/SealBrowser-unsigned.ipa
-          if-no-files-found: error
+          path: ios-project/SealBrowser-unsigned.ipa
