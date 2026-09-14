@@ -14,15 +14,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Extract Seal Browser project
-        run: |
-          unzip -q SealBrowser-iOS-Source.zip -d ios-project
-          ls -la ios-project
-
-      - name: Build unsigned iPhone app
-        working-directory: ios-project
+      - name: Find and build Seal Browser
         run: |
           set -euo pipefail
+
+          echo "Looking for SealBrowser.xcodeproj..."
+
+          PROJECT_PATH="$(find . -name "SealBrowser.xcodeproj" -type d -print -quit)"
+
+          if [ -z "$PROJECT_PATH" ]; then
+            echo "Could not find SealBrowser.xcodeproj"
+            find . -maxdepth 4 -print
+            exit 1
+          fi
+
+          PROJECT_DIR="$(dirname "$PROJECT_PATH")"
+
+          echo "Found project at: $PROJECT_DIR"
+          cd "$PROJECT_DIR"
+
+          rm -rf build Payload SealBrowser-unsigned.ipa
 
           xcodebuild \
             -project SealBrowser.xcodeproj \
@@ -36,15 +47,24 @@ jobs:
             CODE_SIGN_IDENTITY='' \
             clean build
 
-      - name: Package IPA
-        working-directory: ios-project
-        run: |
+          APP_PATH="build/Build/Products/Release-iphoneos/SealBrowser.app"
+
+          if [ ! -d "$APP_PATH" ]; then
+            echo "SealBrowser.app was not created."
+            exit 1
+          fi
+
           mkdir -p Payload
-          cp -R build/Build/Products/Release-iphoneos/SealBrowser.app Payload/SealBrowser.app
+          cp -R "$APP_PATH" Payload/SealBrowser.app
+
           zip -qry SealBrowser-unsigned.ipa Payload
+
+          mkdir -p "$GITHUB_WORKSPACE/ipa-output"
+          cp SealBrowser-unsigned.ipa "$GITHUB_WORKSPACE/ipa-output/"
 
       - name: Upload IPA
         uses: actions/upload-artifact@v7
         with:
           name: SealBrowser-iPhone-IPA
-          path: ios-project/SealBrowser-unsigned.ipa
+          path: ipa-output/SealBrowser-unsigned.ipa
+          if-no-files-found: error
