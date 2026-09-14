@@ -14,26 +14,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Find and build Seal Browser
+      - name: Extract project
+        run: |
+          ZIP="$(find . -iname 'SealBrowser-iOS-Source*.zip' -print -quit)"
+
+          if [ -n "$ZIP" ]; then
+            echo "Found $ZIP"
+            mkdir -p ios-project
+            unzip -q "$ZIP" -d ios-project
+          fi
+
+      - name: Build Seal Browser
         run: |
           set -euo pipefail
 
-          echo "Looking for SealBrowser.xcodeproj..."
-
-          PROJECT_PATH="$(find . -name "SealBrowser.xcodeproj" -type d -print -quit)"
+          PROJECT_PATH="$(find . -name 'SealBrowser.xcodeproj' -type d -print -quit)"
 
           if [ -z "$PROJECT_PATH" ]; then
-            echo "Could not find SealBrowser.xcodeproj"
-            find . -maxdepth 4 -print
+            echo "SealBrowser.xcodeproj not found"
+            find . -maxdepth 5 -print
             exit 1
           fi
 
           PROJECT_DIR="$(dirname "$PROJECT_PATH")"
-
-          echo "Found project at: $PROJECT_DIR"
           cd "$PROJECT_DIR"
-
-          rm -rf build Payload SealBrowser-unsigned.ipa
 
           xcodebuild \
             -project SealBrowser.xcodeproj \
@@ -47,15 +51,8 @@ jobs:
             CODE_SIGN_IDENTITY='' \
             clean build
 
-          APP_PATH="build/Build/Products/Release-iphoneos/SealBrowser.app"
-
-          if [ ! -d "$APP_PATH" ]; then
-            echo "SealBrowser.app was not created."
-            exit 1
-          fi
-
           mkdir -p Payload
-          cp -R "$APP_PATH" Payload/SealBrowser.app
+          cp -R build/Build/Products/Release-iphoneos/SealBrowser.app Payload/
 
           zip -qry SealBrowser-unsigned.ipa Payload
 
@@ -67,4 +64,3 @@ jobs:
         with:
           name: SealBrowser-iPhone-IPA
           path: ipa-output/SealBrowser-unsigned.ipa
-          if-no-files-found: error
